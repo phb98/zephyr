@@ -1010,6 +1010,12 @@ SECTIONS
     *libsubsys__net.a:(.noinit .noinit.*)
 #endif
     . = ALIGN(16);
+    *(.lvgl_buf)
+    . = ALIGN(16);
+    *(.lvgl_heap)
+    . = ALIGN(16);
+    *(.mbedtls_heap)
+    . = ALIGN(16);
     *(.ext_ram_noinit.*)
     . = ALIGN(16);
     _ext_ram_noinit_end = ABSOLUTE(.);
