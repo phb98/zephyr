@@ -1,6 +1,9 @@
 family:
   - name: renesas_rz
     series:
+      - name: rza3ul
+        socs:
+          - name: r9a07g063u02gbg
       - name: rzg3s
         socs:
           - name: r9a08g045s33gbg
@@ -9,3 +12,6 @@ family:
       - name: rzn2l
         socs:
           - name: r9a07g084m04gbg
+      - name: rzt2l
+        socs:
+          - name: r9a07g074m04gbg

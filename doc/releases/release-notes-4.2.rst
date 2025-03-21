@@ -63,8 +63,16 @@ Deprecated APIs and options
 
 ===========================
 
+* ``arduino_uno_r4_minima`` and ``arduino_uno_r4_wifi`` board targets have been deprecated in favor
+  of a new ``arduino_uno_r4`` board with revisions (``arduino_uno_r4@minima`` and
+  ``arduino_uno_r4@wifi``).
+
 New APIs and options
 ====================
+
+* I2C
+
+  * :c:func:`i2c_configure_dt`.
 
 ..
   Link to new APIs here, in a group if you think it's necessary, no need to get
@@ -85,15 +93,31 @@ New APIs and options
     * :c:macro:`BT_BAP_ADV_PARAM_BROADCAST_SLOW`
     * :c:macro:`BT_BAP_PER_ADV_PARAM_BROADCAST_FAST`
     * :c:macro:`BT_BAP_PER_ADV_PARAM_BROADCAST_SLOW`
+    * :c:func:`bt_csip_set_member_set_size_and_rank`
+    * :c:func:`bt_csip_set_member_get_info`
 
   * Host
 
     * :c:func:`bt_le_get_local_features`
     * :c:func:`bt_le_bond_exists`
+    * :c:func:`bt_br_bond_exists`
+    * :c:func:`bt_conn_lookup_addr_br`
+    * :c:func:`bt_conn_get_dst_br`
+    * LE Connection Subrating is no longer experimental.
 
 * Display
 
   * :c:func:`display_clear`
+
+* Networking:
+
+  * IPv4
+
+    * :kconfig:option:`CONFIG_NET_IPV4_MTU`
+
+* Stepper
+
+  * :c:func:`stepper_stop()`
 
 New Boards
 **********
@@ -126,3 +150,9 @@ Other notable changes
 ..
   Any more descriptive subsystem or driver changes. Do you really want to write
   a paragraph or is it enough to link to the api/driver/Kconfig/board page above?
+
+* Added support for Armv8.1-M MPU's PXN (Privileged Execute Never) attribute.
+  With this, the MPU attributes for ``__ramfunc`` and ``__ram_text_reloc`` were modified such that,
+  PXN attribute is set for these regions if compiled with ``CONFIG_ARM_MPU_PXN`` and ``CONFIG_USERSPACE``.
+  This results in a change in behaviour for code being executed from these regions because,
+  if these regions have pxn attribute set in them, they cannot be executed in privileged mode.

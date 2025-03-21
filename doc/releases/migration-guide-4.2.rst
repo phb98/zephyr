@@ -46,8 +46,31 @@ Boards
 
 * Zephyr now supports version 1.11.1 of the :zephyr:board:`neorv32`.
 
+* ``arduino_uno_r4_minima``, ``arduino_uno_r4_wifi``, and ``mikroe_clicker_ra4m1`` have migrated to
+  new FSP-based configurations.
+  While there are no major functional changes, the device tree structure has been significantly revised.
+  The following device tree bindings are now removed:
+  ``renesas,ra-gpio``, ``renesas,ra-uart-sci``, ``renesas,ra-pinctrl``,
+  ``renesas,ra-clock-generation-circuit``, and ``renesas,ra-interrupt-controller-unit``.
+  Instead, use the following replacements:
+  - :dtcompatible:`renesas,ra-gpio-ioport`
+  - :dtcompatible:`renesas,ra-sci-uart`
+  - :dtcompatible:`renesas,ra-pinctrl-pfs`
+  - :dtcompatible:`renesas,ra-cgc-pclk-block`
+
 Device Drivers and Devicetree
 *****************************
+
+DAI
+===
+
+* Renamed the devicetree property ``dai_id`` to ``dai-id``.
+* Renamed the devicetree property ``afe_name`` to ``afe-name``.
+* Renamed the devicetree property ``agent_disable`` to ``agent-disable``.
+* Renamed the devicetree property ``ch_num`` to ``ch-num``.
+* Renamed the devicetree property ``mono_invert`` to ``mono-invert``.
+* Renamed the devicetree property ``quad_ch`` to ``quad-ch``.
+* Renamed the devicetree property ``int_odd`` to ``int-odd``.
 
 Counter
 =======
@@ -76,7 +99,6 @@ Ethernet
 * ``ethernet_native_posix`` has been renamed ``ethernet_native_tap``, and with it its
   kconfig options: :kconfig:option:`CONFIG_ETH_NATIVE_POSIX` and its related options have been
   deprecated in favor of :kconfig:option:`CONFIG_ETH_NATIVE_TAP` (:github:`86578`).
-
 
 GPIO
 ====
@@ -130,8 +152,35 @@ Bluetooth Host
   :zephyr_file:`include/zephyr/bluetooth/conn.h` have been renamed
   to ``BT_LE_CS_TONE_ANTENNA_CONFIGURATION_A<NUMBER>_B<NUMBER>``.
 
+* The ISO data paths are not longer setup automatically, and shall explicitly be setup and removed
+  by the application by calling :c:func:`bt_iso_setup_data_path` and
+  :c:func:`bt_iso_remove_data_path` respectively. (:github:`75549`)
+
+* ``BT_ISO_CHAN_TYPE_CONNECTED`` has been split into ``BT_ISO_CHAN_TYPE_CENTRAL`` and
+  ``BT_ISO_CHAN_TYPE_PERIPHERAL`` to better describe the type of the ISO channel, as behavior for
+  each role may be different. Any existing uses/checks for ``BT_ISO_CHAN_TYPE_CONNECTED``
+  can be replaced with an ``||`` of the two. (:github:`75549`)
+
 Networking
 **********
+
+* The struct ``net_linkaddr_storage`` has been renamed to struct
+  :c:struct:`net_linkaddr` and the old struct ``net_linkaddr`` has been removed.
+  The struct :c:struct:`net_linkaddr` now contains space to store the link
+  address instead of having pointer that point to the link address. This avoids
+  possible dangling pointers when cloning struct :c:struct:`net_pkt`. This will
+  increase the size of struct :c:struct:`net_pkt` by 4 octets for IEEE 802.15.4,
+  but there is no size increase for other network technologies like Ethernet.
+  Note that any code that is using struct :c:struct:`net_linkaddr` directly, and
+  which has checks like ``if (lladdr->addr == NULL)``, will no longer work as expected
+  (because the addr is not a pointer) and must be changed to ``if (lladdr->len == 0)``
+  if the code wants to check that the link address is not set.
+
+SPI
+===
+
+* Renamed the device tree property ``port_sel`` to ``port-sel``.
+* Renamed the device tree property ``chip_select`` to ``chip-select``.
 
 Other subsystems
 ****************
