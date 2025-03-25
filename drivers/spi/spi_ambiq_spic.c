@@ -41,16 +41,12 @@ LOG_MODULE_REGISTER(spi_ambiq);
 #define SPI_AMBIQ_MANUAL_CACHE_COHERENCY_REQUIRED 0
 #endif /* defined(CONFIG_DCACHE) && !defined(CONFIG_NOCACHE_MEMORY) */
 
-#define PWRCTRL_MAX_WAIT_US 5
-
-typedef int (*ambiq_spi_pwr_func_t)(void);
-
 struct spi_ambiq_config {
 	uint32_t base;
 	int size;
+	int inst_idx;
 	uint32_t clock_freq;
 	const struct pinctrl_dev_config *pcfg;
-	ambiq_spi_pwr_func_t pwr_func;
 	void (*irq_config_func)(void);
 };
 
@@ -58,7 +54,6 @@ struct spi_ambiq_data {
 	struct spi_context ctx;
 	am_hal_iom_config_t iom_cfg;
 	void *iom_handler;
-	int inst_idx;
 	bool cont;
 	bool pm_policy_state_on;
 };
@@ -249,7 +244,7 @@ static int spi_config(const struct device *dev, const struct spi_config *config)
 	ctx->config = config;
 
 #ifdef CONFIG_SPI_AMBIQ_DMA
-	data->iom_cfg.pNBTxnBuf = spi_dma_tcb_buf[data->inst_idx].buf;
+	data->iom_cfg.pNBTxnBuf = spi_dma_tcb_buf[cfg->inst_idx].buf;
 	data->iom_cfg.ui32NBTxnBufLength = CONFIG_SPI_DMA_TCB_BUFFER_SIZE;
 #endif
 
@@ -511,13 +506,12 @@ static int spi_ambiq_init(const struct device *dev)
 	const struct spi_ambiq_config *cfg = dev->config;
 	int ret = 0;
 
-	if (AM_HAL_STATUS_SUCCESS !=
-	    am_hal_iom_initialize((cfg->base - IOM0_BASE) / cfg->size, &data->iom_handler)) {
+	if (AM_HAL_STATUS_SUCCESS != am_hal_iom_initialize(cfg->inst_idx, &data->iom_handler)) {
 		LOG_ERR("Fail to initialize SPI\n");
 		return -ENXIO;
 	}
 
-	ret = cfg->pwr_func();
+	ret = am_hal_iom_power_ctrl(data->iom_handler, AM_HAL_SYSCTRL_WAKE, false);
 
 	ret |= pinctrl_apply_state(cfg->pcfg, PINCTRL_STATE_DEFAULT);
 	ret |= spi_context_cs_configure_all(&data->ctx);
@@ -571,14 +565,6 @@ static int spi_ambiq_pm_action(const struct device *dev, enum pm_device_action a
 
 #define AMBIQ_SPI_INIT(n)                                                                          \
 	PINCTRL_DT_INST_DEFINE(n);                                                                 \
-	static int pwr_on_ambiq_spi_##n(void)                                                      \
-	{                                                                                          \
-		uint32_t addr = DT_REG_ADDR(DT_INST_PHANDLE(n, ambiq_pwrcfg)) +                    \
-				DT_INST_PHA(n, ambiq_pwrcfg, offset);                              \
-		sys_write32((sys_read32(addr) | DT_INST_PHA(n, ambiq_pwrcfg, mask)), addr);        \
-		k_busy_wait(PWRCTRL_MAX_WAIT_US);                                                  \
-		return 0;                                                                          \
-	}                                                                                          \
 	static void spi_irq_config_func_##n(void)                                                  \
 	{                                                                                          \
 		IRQ_CONNECT(DT_INST_IRQN(n), DT_INST_IRQ(n, priority), spi_ambiq_isr,              \
@@ -588,14 +574,14 @@ static int spi_ambiq_pm_action(const struct device *dev, enum pm_device_action a
 	static struct spi_ambiq_data spi_ambiq_data##n = {                                         \
 		SPI_CONTEXT_INIT_LOCK(spi_ambiq_data##n, ctx),                                     \
 		SPI_CONTEXT_INIT_SYNC(spi_ambiq_data##n, ctx),                                     \
-		SPI_CONTEXT_CS_GPIOS_INITIALIZE(DT_DRV_INST(n), ctx).inst_idx = n};                \
+		SPI_CONTEXT_CS_GPIOS_INITIALIZE(DT_DRV_INST(n), ctx)};                             \
 	static const struct spi_ambiq_config spi_ambiq_config##n = {                               \
 		.base = DT_INST_REG_ADDR(n),                                                       \
 		.size = DT_INST_REG_SIZE(n),                                                       \
+		.inst_idx = (DT_INST_REG_ADDR(n) - IOM0_BASE) / (IOM1_BASE - IOM0_BASE),           \
 		.clock_freq = DT_INST_PROP(n, clock_frequency),                                    \
 		.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(n),                                         \
-		.irq_config_func = spi_irq_config_func_##n,                                        \
-		.pwr_func = pwr_on_ambiq_spi_##n};                                                 \
+		.irq_config_func = spi_irq_config_func_##n};                                       \
 	PM_DEVICE_DT_INST_DEFINE(n, spi_ambiq_pm_action);                                          \
 	SPI_DEVICE_DT_INST_DEFINE(n, spi_ambiq_init, PM_DEVICE_DT_INST_GET(n), &spi_ambiq_data##n, \
 				  &spi_ambiq_config##n, POST_KERNEL, CONFIG_SPI_INIT_PRIORITY,     \

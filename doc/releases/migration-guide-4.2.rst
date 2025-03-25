@@ -72,6 +72,12 @@ DAI
 * Renamed the devicetree property ``quad_ch`` to ``quad-ch``.
 * Renamed the devicetree property ``int_odd`` to ``int-odd``.
 
+DMA
+===
+
+* Renamed the devicetree property ``nxp,a_on`` to ``nxp,a-on``.
+* Renamed the devicetree property ``dma_channels`` to ``dma-channels``.
+
 Counter
 =======
 
@@ -99,6 +105,18 @@ Ethernet
 * ``ethernet_native_posix`` has been renamed ``ethernet_native_tap``, and with it its
   kconfig options: :kconfig:option:`CONFIG_ETH_NATIVE_POSIX` and its related options have been
   deprecated in favor of :kconfig:option:`CONFIG_ETH_NATIVE_TAP` (:github:`86578`).
+
+Enhanced Serial Peripheral Interface (eSPI)
+===========================================
+
+* Renamed the devicetree property ``io_girq`` to ``io-girq``.
+* Renamed the devicetree property ``vw_girqs`` to ``vw-girqs``.
+* Renamed the devicetree property ``pc_girq`` to ``pc-girq``.
+* Renamed the devicetree property ``poll_timeout`` to ``poll-timeout``.
+* Renamed the devicetree property ``poll_interval`` to ``poll-interval``.
+* Renamed the devicetree property ``consec_rd_timeout`` to ``consec-rd-timeout``.
+* Renamed the devicetree property ``sus_chk_delay`` to ``sus-chk-delay``.
+* Renamed the devicetree property ``sus_rsm_interval`` to ``sus-rsm-interval``.
 
 GPIO
 ====
@@ -135,6 +153,13 @@ Timer
 * ``native_posix_timer`` has been renamed ``native_sim_timer``, and so its kconfig option
   :kconfig:option:`CONFIG_NATIVE_POSIX_TIMER` has been deprecated in favor of
   :kconfig:option:`CONFIG_NATIVE_SIM_TIMER`, (:github:`86612`).
+
+Modem
+=====
+
+* Removed Kconfig option :kconfig:option:`CONFIG_MODEM_CELLULAR_CMUX_MAX_FRAME_SIZE` in favor of
+  :kconfig:option:`CONFIG_MODEM_CMUX_WORK_BUFFER_SIZE` and :kconfig:option:`CONFIG_MODEM_CMUX_MTU`.
+
 
 Bluetooth
 *********
@@ -175,6 +200,10 @@ Networking
   which has checks like ``if (lladdr->addr == NULL)``, will no longer work as expected
   (because the addr is not a pointer) and must be changed to ``if (lladdr->len == 0)``
   if the code wants to check that the link address is not set.
+
+* TLS credential type ``TLS_CREDENTIAL_SERVER_CERTIFICATE`` was renamed to
+  more generic :c:enumerator:`TLS_CREDENTIAL_PUBLIC_CERTIFICATE` to better
+  reflect the purpose of this credential type.
 
 SPI
 ===
