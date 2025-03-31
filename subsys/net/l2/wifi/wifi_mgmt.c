@@ -333,6 +333,24 @@ const char *wifi_ps_exit_strategy_txt(enum wifi_ps_exit_strategy ps_exit_strateg
 	}
 }
 
+const char *wifi_conn_status_txt(enum wifi_conn_status status)
+{
+	switch (status) {
+	case WIFI_STATUS_CONN_SUCCESS:
+		return "Connection successful";
+	case WIFI_STATUS_CONN_FAIL:
+		return "Connection failed";
+	case WIFI_STATUS_CONN_WRONG_PASSWORD:
+		return "Wrong password";
+	case WIFI_STATUS_CONN_TIMEOUT:
+		return "Connection timeout";
+	case WIFI_STATUS_CONN_AP_NOT_FOUND:
+		return "AP not found";
+	default:
+		return "UNKNOWN";
+	}
+}
+
 static const struct wifi_mgmt_ops *const get_wifi_api(struct net_if *iface)
 {
 	const struct device *dev = net_if_get_device(iface);
@@ -1442,6 +1460,9 @@ static int __stored_creds_to_params(struct wifi_credentials_personal *creds,
 {
 	char *ssid = NULL;
 	char *psk = NULL;
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE
+	char *key_passwd = NULL;
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE */
 	int ret;
 
 	/* SSID */
@@ -1487,6 +1508,29 @@ static int __stored_creds_to_params(struct wifi_credentials_personal *creds,
 	/* Defaults */
 	params->security = creds->header.type;
 
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE
+	if (params->security == WIFI_SECURITY_TYPE_EAP_TLS) {
+		if (creds->header.key_passwd_length > 0) {
+			key_passwd = (char *)k_malloc(creds->header.key_passwd_length + 1);
+			if (!key_passwd) {
+				LOG_ERR("Failed to allocate memory for key_passwd\n");
+				ret = -ENOMEM;
+				goto err_out;
+			}
+			memset(key_passwd, 0, creds->header.key_passwd_length + 1);
+			ret = snprintf(key_passwd, creds->header.key_passwd_length + 1, "%s",
+				       creds->header.key_passwd);
+			if (ret > creds->header.key_passwd_length) {
+				LOG_ERR("key_passwd string truncated\n");
+				ret = -EINVAL;
+				goto err_out;
+			}
+			params->key_passwd = key_passwd;
+			params->key_passwd_length = creds->header.key_passwd_length;
+		}
+	}
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE */
+
 	/* If channel is set to 0 we default to ANY. 0 is not a valid Wi-Fi channel. */
 	params->channel = (creds->header.channel != 0) ? creds->header.channel : WIFI_CHANNEL_ANY;
 	params->timeout = (creds->header.timeout != 0)
@@ -1526,6 +1570,13 @@ err_out:
 		k_free(psk);
 		psk = NULL;
 	}
+
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE
+	if (key_passwd) {
+		k_free(key_passwd);
+		key_passwd = NULL;
+	}
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE */
 
 	return ret;
 }

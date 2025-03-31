@@ -67,6 +67,12 @@ Deprecated APIs and options
   renamed and deprecated. Use :kconfig:option:`CONFIG_SCHED_SIMPLE` and
   :kconfig:option:`CONFIG_WAITQ_SIMPLE` instead.
 
+* The :kconfig:option:`CONFIG_LWM2M_ENGINE_MESSAGE_HEADER_SIZE` Kconfig option has been removed.
+  The required header size should be included in the message size, configured using
+  :kconfig:option:`CONFIG_LWM2M_COAP_MAX_MSG_SIZE`. Special care should be taken to ensure that
+  used CoAP block size :kconfig:option:`CONFIG_LWM2M_COAP_BLOCK_SIZE` can fit given message size
+  with headers. Previous headroom was 48 bytes.
+
 * TLS credential type ``TLS_CREDENTIAL_SERVER_CERTIFICATE`` was renamed and
   deprecated, use :c:enumerator:`TLS_CREDENTIAL_PUBLIC_CERTIFICATE` instead.
 
@@ -125,9 +131,17 @@ New APIs and options
 
     * :kconfig:option:`CONFIG_NET_IPV4_MTU`
 
+  * MQTT
+
+    * :kconfig:option:`CONFIG_MQTT_VERSION_5_0`
+
 * Stepper
 
   * :c:func:`stepper_stop()`
+
+* Counter
+
+  * :c:func:`counter_reset`
 
 New Boards
 **********
@@ -365,3 +379,7 @@ Other notable changes
   PXN attribute is set for these regions if compiled with ``CONFIG_ARM_MPU_PXN`` and ``CONFIG_USERSPACE``.
   This results in a change in behaviour for code being executed from these regions because,
   if these regions have pxn attribute set in them, they cannot be executed in privileged mode.
+
+* Removed support for Nucleo WBA52CG board (``nucleo_wba52cg``) since it is NRND (Not Recommended
+  for New Design) and it is not supported anymore in the STM32CubeWBA from version 1.1.0 (July 2023).
+  The migration to :zephyr:board:`nucleo_wba55cg` (``nucleo_wba55cg``) is recommended instead.
