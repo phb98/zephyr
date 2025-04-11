@@ -683,7 +683,7 @@ bool bt_gatt_service_is_registered(const struct bt_gatt_service *svc);
 /** @brief to be used as return values for @ref bt_gatt_attr_func_t and @ref bt_gatt_read_func_t
  *  type callbacks.
  */
-enum {
+enum bt_gatt_iter {
 	BT_GATT_ITER_STOP = 0,
 	BT_GATT_ITER_CONTINUE,
 };
@@ -1166,6 +1166,20 @@ ssize_t bt_gatt_attr_write_ccc(struct bt_conn *conn,
 #define BT_GATT_CCC(_changed, _perm)				\
 	BT_GATT_CCC_MANAGED(((struct _bt_gatt_ccc[])			\
 		{BT_GATT_CCC_INITIALIZER(_changed, NULL, NULL)}), _perm)
+
+/**
+ *  @brief Client Characteristic Configuration Declaration Macro with write callback.
+ *
+ *  Helper macro to declare a CCC attribute with a write callback.
+ *
+ *  @param _changed Configuration changed callback.
+ *  @param _write Configuration write callback.
+ *  @param _perm CCC access permissions,
+ *               a bitmap of @ref bt_gatt_perm values.
+ */
+#define BT_GATT_CCC_WITH_WRITE_CB(_changed, _write, _perm)		\
+	BT_GATT_CCC_MANAGED(((struct _bt_gatt_ccc[])			\
+		{BT_GATT_CCC_INITIALIZER(_changed, _write, NULL) }), _perm)
 
 /** @brief Read Characteristic Extended Properties Attribute helper
  *

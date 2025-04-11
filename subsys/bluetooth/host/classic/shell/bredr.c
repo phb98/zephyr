@@ -753,6 +753,58 @@ done:
 	return BT_SDP_DISCOVER_UUID_CONTINUE;
 }
 
+static uint8_t sdp_hfp_hf_user(struct bt_conn *conn,
+			       struct bt_sdp_client_result *result,
+			       const struct bt_sdp_discover_params *params)
+{
+	char addr[BT_ADDR_STR_LEN];
+	uint16_t param, version;
+	uint16_t features;
+	int err;
+
+	conn_addr_str(conn, addr, sizeof(addr));
+
+	if (result && result->resp_buf) {
+		bt_shell_print("SDP HFPHF data@%p (len %u) hint %u from remote %s",
+			       result->resp_buf, result->resp_buf->len, result->next_record_hint,
+			       addr);
+
+		/*
+		 * Focus to get BT_SDP_ATTR_PROTO_DESC_LIST attribute item to
+		 * get HFPHF Server Channel Number operating on RFCOMM protocol.
+		 */
+		err = bt_sdp_get_proto_param(result->resp_buf, BT_SDP_PROTO_RFCOMM, &param);
+		if (err < 0) {
+			bt_shell_error("Error getting Server CN, err %d", err);
+			goto done;
+		}
+		bt_shell_print("HFPHF Server CN param 0x%04x", param);
+
+		err = bt_sdp_get_profile_version(result->resp_buf, BT_SDP_HANDSFREE_SVCLASS,
+						 &version);
+		if (err < 0) {
+			bt_shell_error("Error getting profile version, err %d", err);
+			goto done;
+		}
+		bt_shell_print("HFP version param 0x%04x", version);
+
+		/*
+		 * Focus to get BT_SDP_ATTR_SUPPORTED_FEATURES attribute item to
+		 * get profile Supported Features mask.
+		 */
+		err = bt_sdp_get_features(result->resp_buf, &features);
+		if (err < 0) {
+			bt_shell_error("Error getting HFPHF Features, err %d", err);
+			goto done;
+		}
+		bt_shell_print("HFPHF Supported Features param 0x%04x", features);
+	} else {
+		bt_shell_print("No SDP HFPHF data from remote %s", addr);
+	}
+done:
+	return BT_SDP_DISCOVER_UUID_CONTINUE;
+}
+
 static uint8_t sdp_a2src_user(struct bt_conn *conn, struct bt_sdp_client_result *result,
 			      const struct bt_sdp_discover_params *params)
 {
@@ -816,6 +868,13 @@ static struct bt_sdp_discover_params discov_hfpag = {
 	.pool = &sdp_client_pool,
 };
 
+static struct bt_sdp_discover_params discov_hfphf = {
+	.type = BT_SDP_DISCOVER_SERVICE_SEARCH_ATTR,
+	.uuid = BT_UUID_DECLARE_16(BT_SDP_HANDSFREE_SVCLASS),
+	.func = sdp_hfp_hf_user,
+	.pool = &sdp_client_pool,
+};
+
 static struct bt_sdp_discover_params discov_a2src = {
 	.type = BT_SDP_DISCOVER_SERVICE_SEARCH_ATTR,
 	.uuid = BT_UUID_DECLARE_16(BT_SDP_AUDIO_SOURCE_SVCLASS),
@@ -839,6 +898,8 @@ static int cmd_sdp_find_record(const struct shell *sh, size_t argc, char *argv[]
 
 	if (!strcmp(action, "HFPAG")) {
 		discov = discov_hfpag;
+	} else if (!strcmp(action, "HFPHF")) {
+		discov = discov_hfphf;
 	} else if (!strcmp(action, "A2SRC")) {
 		discov = discov_a2src;
 	} else {
@@ -859,6 +920,59 @@ static int cmd_sdp_find_record(const struct shell *sh, size_t argc, char *argv[]
 	return 0;
 }
 
+static void bond_info(const struct bt_br_bond_info *info, void *user_data)
+{
+	char addr[BT_ADDR_STR_LEN];
+	int *bond_count = user_data;
+
+	bt_addr_to_str(&info->addr, addr, sizeof(addr));
+	bt_shell_print("Remote Identity: %s", addr);
+	(*bond_count)++;
+}
+
+static int cmd_bonds(const struct shell *sh, size_t argc, char *argv[])
+{
+	int bond_count = 0;
+
+	shell_print(sh, "Bonded devices:");
+	bt_br_foreach_bond(bond_info, &bond_count);
+	shell_print(sh, "Total %d", bond_count);
+
+	return 0;
+}
+
+static int cmd_clear(const struct shell *sh, size_t argc, char *argv[])
+{
+	bt_addr_t addr;
+	int err;
+
+	if (strcmp(argv[1], "all") == 0) {
+		err = bt_br_unpair(NULL);
+		if (err) {
+			shell_error(sh, "Failed to clear pairings (err %d)", err);
+			return err;
+		}
+
+		shell_print(sh, "Pairings successfully cleared");
+		return 0;
+	}
+
+	err = bt_addr_from_str(argv[1], &addr);
+	if (err) {
+		shell_print(sh, "Invalid address");
+		return err;
+	}
+
+	err = bt_br_unpair(&addr);
+	if (err) {
+		shell_error(sh, "Failed to clear pairing (err %d)", err);
+	} else {
+		shell_print(sh, "Pairing successfully cleared");
+	}
+
+	return err;
+}
+
 static int cmd_default_handler(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc == 1) {
@@ -872,7 +986,7 @@ static int cmd_default_handler(const struct shell *sh, size_t argc, char **argv)
 }
 
 #define HELP_NONE "[none]"
-#define HELP_ADDR_LE "<address: XX:XX:XX:XX:XX:XX> <type: (public|random)>"
+#define HELP_ADDR "<address: XX:XX:XX:XX:XX:XX>"
 #define HELP_REG                                                      \
 	"<psm> <mode: none, ret, fc, eret, stream> [hold_credit] "    \
 	"[mode_optional] [extended_control]"
@@ -901,6 +1015,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(l2cap_cmds,
 SHELL_STATIC_SUBCMD_SET_CREATE(br_cmds,
 	SHELL_CMD_ARG(auth-pincode, NULL, "<pincode>", cmd_auth_pincode, 2, 0),
 	SHELL_CMD_ARG(connect, NULL, "<address>", cmd_connect, 2, 0),
+	SHELL_CMD_ARG(bonds, NULL, HELP_NONE, cmd_bonds, 1, 0),
+	SHELL_CMD_ARG(clear, NULL, "[all] ["HELP_ADDR"]", cmd_clear, 2, 0),
 	SHELL_CMD_ARG(discovery, NULL, "<value: on, off> [length: 1-48] [mode: limited]",
 		      cmd_discovery, 2, 2),
 	SHELL_CMD_ARG(iscan, NULL, "<value: on, off> [mode: limited]",
@@ -908,7 +1024,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(br_cmds,
 	SHELL_CMD(l2cap, &l2cap_cmds, HELP_NONE, cmd_default_handler),
 	SHELL_CMD_ARG(oob, NULL, NULL, cmd_oob, 1, 0),
 	SHELL_CMD_ARG(pscan, NULL, "<value: on, off>", cmd_connectable, 2, 0),
-	SHELL_CMD_ARG(sdp-find, NULL, "<HFPAG>", cmd_sdp_find_record, 2, 0),
+	SHELL_CMD_ARG(sdp-find, NULL, "<HFPAG, HFPHF>", cmd_sdp_find_record, 2, 0),
 	SHELL_SUBCMD_SET_END
 );
 
