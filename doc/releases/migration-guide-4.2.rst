@@ -41,8 +41,8 @@ Boards
 * All boards based on a Nordic IC of the nRF54L series now default to not
   erasing any part of the internal storage when flashing. If you'd like to
   revert to the previous default of erasing the pages that will be written to by
-  the firmware to be flashed you can use the new ``--erase-pages`` command-line
-  switch when invoking ``west flash``.
+  the firmware to be flashed you can set the new ``--erase-mode`` command-line
+  switch when invoking ``west flash`` to ``ranges``.
   Note that RRAM on nRF54L devices is not physically paged, and paging is
   only artificially provided, with a page size of 4096 bytes, for an easier
   transition of nRF52 software to nRF54L devices.
@@ -163,6 +163,12 @@ GPIO
   now left as a placeholder and mapper.
   The labels have also been changed along, so no changes are necessary for regular use.
 
+I2S
+===
+* The :dtcompatible:`nxp,mcux-i2s` driver added property ``mclk-output``. Set this property to
+* configure the MCLK signal as an output.  Older driver versions used the macro
+* ``I2S_OPT_BIT_CLK_SLAVE`` to configure the MCLK signal direction. (:github:`88554`)
+
 Sensors
 =======
 
@@ -173,6 +179,10 @@ Sensors
 
 * :dtcompatible:`ti,tmp116` has been renamed to :dtcompatible:`ti,tmp11x` because it supports
   tmp116, tmp117 and tmp119.
+
+* :dtcompatible:`meas,ms5837` has been replaced by :dtcompatible:`meas,ms5837-30ba`
+  and :dtcompatible:`meas,ms5837-02ba`. In order to use one of the two variants, the
+  status property needs to be used as well.
 
 Serial
 =======
@@ -239,6 +249,12 @@ Bluetooth Host
   each role may be different. Any existing uses/checks for ``BT_ISO_CHAN_TYPE_CONNECTED``
   can be replaced with an ``||`` of the two. (:github:`75549`)
 
+* The ``struct _bt_gatt_ccc`` in :zephyr_file:`include/zephyr/bluetooth/gatt.h` has been renamed to
+  struct :c:struct:`bt_gatt_ccc_managed_user_data`. (:github:`88652`)
+
+* The macro ``BT_GATT_CCC_INITIALIZER`` in :zephyr_file:`include/zephyr/bluetooth/gatt.h`
+  has been renamed to :c:macro:`BT_GATT_CCC_MANAGED_USER_DATA_INIT`. (:github:`88652`)
+
 Bluetooth Classic
 =================
 
@@ -288,6 +304,13 @@ SPI
 
 Other subsystems
 ****************
+
+ZBus
+====
+
+* The function :c:func:`zbus_chan_add_obs` now requires a :c:struct:`zbus_observer_node` as an argument,
+  which was previously allocated through :c:func:`k_malloc` internally. The structure must remain valid
+  in memory until :c:func:`zbus_chan_rem_obs` is called.
 
 Modules
 *******
