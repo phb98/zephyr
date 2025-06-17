@@ -464,7 +464,19 @@ class NrfBinaryRunner(ZephyrBinaryRunner):
         self.logger.debug(f'Erase modes: chip:{erase_arg} ext_mem:'
                           f'{ext_mem_erase_opt}')
 
+        # Temp hack while waiting for NRF54H20_IRON support for Network in nrfutil
+        if self.build_conf.get('CONFIG_SOC_NRF54H20_IRON') and core == "Network":
+            core = "Application"
+
         self.op_program(self.hex_, erase_arg, ext_mem_erase_opt, defer=True, core=core)
+
+        if self.erase or self.recover:
+            # provision keys if keyfile.json exists in the build directory
+            keyfile = Path(self.cfg.build_dir).parent / 'keyfile.json'
+            if keyfile.exists():
+                self.logger.info(f'Provisioning key file: {keyfile}')
+                self.exec_op('x-provision-keys', keyfile=str(keyfile), defer=True)
+
         self.flush(force=False)
 
 

@@ -261,19 +261,19 @@ static void phy_link_state_changed(const struct device *pdev, struct phy_link_st
 		       (SY1XX_MAC_CTRL_CLK_DIV_MASK << SY1XX_MAC_CTRL_CLK_DIV_OFFS));
 
 		switch (speed) {
-		case LINK_FULL_10BASE_T:
+		case LINK_FULL_10BASE:
 			LOG_INF("link speed FULL_10BASE_T");
 			/* 2.5MHz, MAC is clock source */
 			v |= (SY1XX_MAC_CTRL_CLK_SEL_MII_CLK << SY1XX_MAC_CTRL_CLK_SEL_OFFS) |
 			     (SY1XX_MAC_CTRL_CLK_DIV_10 << SY1XX_MAC_CTRL_CLK_DIV_OFFS);
 			break;
-		case LINK_FULL_100BASE_T:
+		case LINK_FULL_100BASE:
 			LOG_INF("link speed FULL_100BASE_T");
 			/* 25MHz, MAC is clock source */
 			v |= (SY1XX_MAC_CTRL_CLK_SEL_MII_CLK << SY1XX_MAC_CTRL_CLK_SEL_OFFS) |
 			     (SY1XX_MAC_CTRL_CLK_DIV_1 << SY1XX_MAC_CTRL_CLK_DIV_OFFS);
 			break;
-		case LINK_FULL_1000BASE_T:
+		case LINK_FULL_1000BASE:
 			LOG_INF("link speed FULL_1000BASE_T");
 			/* 125MHz, Phy is clock source */
 			v |= BIT(SY1XX_MAC_CTRL_GMII_OFFS) |
@@ -346,34 +346,10 @@ static enum ethernet_hw_caps sy1xx_mac_get_caps(const struct device *dev)
 
 	/* basic implemented features */
 	supported |= ETHERNET_PROMISC_MODE;
-	supported |= ETHERNET_LINK_1000BASE_T;
+	supported |= ETHERNET_LINK_1000BASE;
 	supported |= ETHERNET_PROMISC_MODE;
 
 	return supported;
-}
-
-static int sy1xx_mac_get_config(const struct device *dev, enum ethernet_config_type type,
-				struct ethernet_config *config)
-{
-	struct sy1xx_mac_dev_data *data = (struct sy1xx_mac_dev_data *)dev->data;
-
-	/* we currently support only 1000mbit/s full duplex */
-	switch (type) {
-	case ETHERNET_CONFIG_TYPE_LINK:
-		config->l.link_1000bt = true;
-		break;
-
-	case ETHERNET_CONFIG_TYPE_DUPLEX:
-		config->full_duplex = true;
-		break;
-
-	case ETHERNET_CONFIG_TYPE_MAC_ADDRESS:
-		memcpy(config->mac_address.addr, data->mac_addr, 6);
-		break;
-	default:
-		return -ENOTSUP;
-	}
-	return 0;
 }
 
 static int sy1xx_mac_set_config(const struct device *dev, enum ethernet_config_type type,
@@ -588,7 +564,6 @@ const struct ethernet_api sy1xx_mac_driver_api = {
 	.stop = sy1xx_mac_stop,
 	.iface_api.init = sy1xx_mac_iface_init,
 	.get_capabilities = sy1xx_mac_get_caps,
-	.get_config = sy1xx_mac_get_config,
 	.set_config = sy1xx_mac_set_config,
 	.send = sy1xx_mac_send,
 	.get_phy = sy1xx_mac_get_phy,

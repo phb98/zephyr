@@ -81,6 +81,13 @@ if(CONFIG_RISCV_ISA_EXT_ZBS)
     string(CONCAT riscv_march ${riscv_march} "_zbs")
 endif()
 
+# Check whether we already imply Zmmul by selecting the M extension; if not - enable it
+if(NOT CONFIG_RISCV_ISA_EXT_M AND
+   CONFIG_RISCV_ISA_EXT_ZMMUL AND
+   "${GCC_COMPILER_VERSION}" VERSION_GREATER_EQUAL 13.0.0)
+    string(CONCAT riscv_march ${riscv_march} "_zmmul")
+endif()
+
 list(APPEND TOOLCHAIN_C_FLAGS -mabi=${riscv_mabi} -march=${riscv_march})
 list(APPEND TOOLCHAIN_LD_FLAGS NO_SPLIT -mabi=${riscv_mabi} -march=${riscv_march})
 

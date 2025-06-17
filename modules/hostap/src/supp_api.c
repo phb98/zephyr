@@ -415,6 +415,8 @@ enum wifi_security_type wpas_key_mgmt_to_zephyr(bool is_hapd, void *config, int 
 		return WIFI_SECURITY_TYPE_FT_SAE;
 	case WPA_KEY_MGMT_FT_IEEE8021X:
 		return WIFI_SECURITY_TYPE_FT_EAP;
+	case WPA_KEY_MGMT_DPP:
+		return WIFI_SECURITY_TYPE_DPP;
 	case WPA_KEY_MGMT_FT_IEEE8021X_SHA384:
 		return WIFI_SECURITY_TYPE_FT_EAP_SHA384;
 	case WPA_KEY_MGMT_SAE_EXT_KEY:
@@ -830,13 +832,15 @@ static int wpas_add_and_config_network(struct wpa_supplicant *wpa_s,
 				if (params->TLS_cipher == WIFI_EAP_TLS_ECC_P384) {
 					if (!wpa_cli_cmd_v("set_network %d openssl_ciphers \"%s\"",
 							resp.network_id,
-							cipher_config.openssl_ciphers))
+							cipher_config.openssl_ciphers)) {
 						goto out;
+					}
 				} else if (params->TLS_cipher == WIFI_EAP_TLS_RSA_3K) {
 					snprintf(phase1, sizeof(phase1), "tls_suiteb=1");
 					if (!wpa_cli_cmd_v("set_network %d phase1 \"%s\"",
-							resp.network_id, &phase1[0]))
+							resp.network_id, &phase1[0])) {
 						goto out;
+					}
 				}
 			}
 

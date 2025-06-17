@@ -19,4 +19,8 @@ supported:
   - pwm
   - spi
   - netif:eth
+  - counter
+testing:
+  binaries:
+    - flash.bin
 vendor: nxp

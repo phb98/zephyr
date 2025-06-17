@@ -485,8 +485,12 @@ void reg_change_callbk_fn(void *vif_ctx,
 }
 #endif /* !CONFIG_NRF70_RADIO_TEST */
 
+#ifdef CONFIG_NRF71_ON_IPC
+#define MAX_TX_PWR(label) DT_PROP(DT_NODELABEL(wifi), label) * 4
+#else
 /* DTS uses 1dBm as the unit for TX power, while the RPU uses 0.25dBm */
 #define MAX_TX_PWR(label) DT_PROP(DT_NODELABEL(nrf70), label) * 4
+#endif /* CONFIG_NRF71_ON_IPC */
 
 void configure_tx_pwr_settings(struct nrf_wifi_tx_pwr_ctrl_params *tx_pwr_ctrl_params,
 				struct nrf_wifi_tx_pwr_ceil_params *tx_pwr_ceil_params)
@@ -848,7 +852,7 @@ err:
 
 #ifndef CONFIG_NRF70_RADIO_TEST
 #ifdef CONFIG_NET_L2_WIFI_MGMT
-static struct wifi_mgmt_ops nrf_wifi_mgmt_ops = {
+static const struct wifi_mgmt_ops nrf_wifi_mgmt_ops = {
 	.scan = nrf_wifi_disp_scan_zep,
 #ifdef CONFIG_NET_STATISTICS_WIFI
 	.get_stats = nrf_wifi_stats_get,
@@ -877,7 +881,7 @@ static struct wifi_mgmt_ops nrf_wifi_mgmt_ops = {
 
 
 #ifdef CONFIG_NRF70_STA_MODE
-static struct zep_wpa_supp_dev_ops wpa_supp_ops = {
+static const struct zep_wpa_supp_dev_ops wpa_supp_ops = {
 	.init = nrf_wifi_wpa_supp_dev_init,
 	.deinit = nrf_wifi_wpa_supp_dev_deinit,
 	.scan2 = nrf_wifi_wpa_supp_scan2,
