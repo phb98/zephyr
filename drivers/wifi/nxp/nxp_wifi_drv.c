@@ -107,7 +107,6 @@ int nxp_wifi_wlan_event_callback(enum wlan_event_reason reason, void *data)
 	struct in_addr dhcps_addr4;
 	struct in_addr base_addr;
 	struct in_addr netmask_addr;
-	struct wifi_iface_status status = { 0 };
 	struct wifi_ap_sta_info ap_sta_info = { 0 };
 #endif
 
@@ -286,31 +285,49 @@ int nxp_wifi_wlan_event_callback(enum wlan_event_reason reason, void *data)
 		s_nxp_wifi_UapActivated = true;
 		break;
 	case WLAN_REASON_UAP_CLIENT_ASSOC:
-		wlan_get_current_uap_network(&nxp_wlan_uap_network);
-#ifdef CONFIG_NXP_WIFI_11AX
-		if (nxp_wlan_uap_network.dot11ax) {
-			ap_sta_info.link_mode = WIFI_6;
-		} else
-#endif
-#ifdef CONFIG_NXP_WIFI_11AC
-			if (nxp_wlan_uap_network.dot11ac) {
-				ap_sta_info.link_mode = WIFI_5;
-		} else
-#endif
-			if (nxp_wlan_uap_network.dot11n) {
-				ap_sta_info.link_mode = WIFI_4;
-		} else {
-			ap_sta_info.link_mode = WIFI_3;
-		}
+		sta_node *con_sta_info = (sta_node *)data;
 
-		memcpy(ap_sta_info.mac, data, WIFI_MAC_ADDR_LEN);
+		if (con_sta_info->is_11n_enabled) {
+			ap_sta_info.link_mode = WIFI_4;
+		} else {
+			if (con_sta_info->bandmode == BAND_B) {
+				ap_sta_info.link_mode = WIFI_1;
+			} else {
+				uint32_t ap_channel = 0;
+
+				(void)wlan_get_uap_channel(&ap_channel);
+				if (ap_channel > 14) {
+					ap_sta_info.link_mode = WIFI_2;
+				} else {
+					ap_sta_info.link_mode = WIFI_3;
+				}
+			}
+		}
+#ifdef CONFIG_NXP_WIFI_11AC
+		if (con_sta_info->is_11ac_enabled) {
+			ap_sta_info.link_mode = WIFI_5;
+		}
+#endif
+#ifdef CONFIG_NXP_WIFI_11AX
+		if (con_sta_info->is_11ax_enabled) {
+			ap_sta_info.link_mode = WIFI_6;
+		}
+#endif
+
+#ifdef CONFIG_NXP_WIFI_11AX_TWT
+		IEEEtypes_HECap_t sta_he_cap = con_sta_info->he_cap;
+		uint8_t sta_twt_cap = sta_he_cap.he_mac_cap[0];
+
+		ap_sta_info.twt_capable = sta_twt_cap & HE_MAC_CAP_TWT_REQ_SUPPORT ? true : false;
+#endif
+
+		memcpy(ap_sta_info.mac, con_sta_info->mac_addr, WIFI_MAC_ADDR_LEN);
 		ap_sta_info.mac_length  = WIFI_MAC_ADDR_LEN;
-		ap_sta_info.twt_capable = status.twt_capable;
 
 		wifi_mgmt_raise_ap_sta_connected_event(g_uap.netif, &ap_sta_info);
 		LOG_DBG("WLAN: UAP a Client Associated");
 		LOG_DBG("Client => ");
-		print_mac((const char *)data);
+		print_mac((const char *)con_sta_info->mac_addr);
 		LOG_DBG("Associated with Soft AP");
 		break;
 	case WLAN_REASON_UAP_CLIENT_CONN:
@@ -1213,12 +1230,10 @@ static int nxp_wifi_status(const struct device *dev, struct wifi_iface_status *s
 
 			if (if_handle->state.interface == WLAN_BSS_TYPE_STA) {
 				status->iface_mode = WIFI_MODE_INFRA;
-			}
-#ifdef CONFIG_NXP_WIFI_SOFTAP_SUPPORT
-			else if (if_handle->state.interface == WLAN_BSS_TYPE_UAP) {
+			} else if (IS_ENABLED(CONFIG_NXP_WIFI_SOFTAP_SUPPORT) &&
+				   (if_handle->state.interface == WLAN_BSS_TYPE_UAP)) {
 				status->iface_mode = WIFI_MODE_AP;
 			}
-#endif
 
 #ifdef CONFIG_NXP_WIFI_11AX
 			if (nxp_wlan_network.dot11ax) {
@@ -1235,7 +1250,11 @@ static int nxp_wifi_status(const struct device *dev, struct wifi_iface_status *s
 			} else {
 				status->link_mode = WIFI_3;
 			}
-
+#ifdef CONFIG_NXP_WIFI_11AX_TWT
+			status->twt_capable = nxp_wlan_network.twt_capab;
+#else
+			status->twt_capable = false;
+#endif
 			status->band = nxp_wlan_network.channel > 14 ? WIFI_FREQ_BAND_5_GHZ
 								     : WIFI_FREQ_BAND_2_4_GHZ;
 			status->security = nxp_wifi_key_mgmt_to_zephyr(
@@ -1273,12 +1292,11 @@ static int nxp_wifi_get_detail_stats(int bss_type, wlan_pkt_stats_t *stats)
 
 	if (bss_type == WLAN_BSS_TYPE_STA) {
 		ret = wlan_get_log(stats);
-	}
-#ifdef CONFIG_NXP_WIFI_SOFTAP_SUPPORT
-	else if (bss_type == WLAN_BSS_TYPE_UAP) {
+	} else if (IS_ENABLED(CONFIG_NXP_WIFI_SOFTAP_SUPPORT) &&
+		   (bss_type == WLAN_BSS_TYPE_UAP)) {
 		ret = wlan_uap_get_log(stats);
 	}
-#endif
+
 	return ret;
 }
 #endif
@@ -2030,13 +2048,12 @@ static int nxp_wifi_set_config(const struct device *dev, enum ethernet_config_ty
 				LOG_ERR("Failed to set Wi-Fi MAC Address");
 				return -ENOEXEC;
 			}
-#ifdef CONFIG_NXP_WIFI_SOFTAP_SUPPORT
-		} else if (if_handle->state.interface == WLAN_BSS_TYPE_UAP) {
+		} else if (IS_ENABLED(CONFIG_NXP_WIFI_SOFTAP_SUPPORT) &&
+			   (if_handle->state.interface == WLAN_BSS_TYPE_UAP)) {
 			if (wlan_set_uap_mac_addr(if_handle->mac_address)) {
 				LOG_ERR("Failed to set Wi-Fi MAC Address");
 				return -ENOEXEC;
 			}
-#endif
 		} else {
 			LOG_ERR("Invalid Interface index");
 			return -ENOEXEC;

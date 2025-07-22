@@ -39,7 +39,7 @@ struct xtensa_register {
 	uint32_t	val;
 
 	/** GDB register index (for p/P packets) */
-	uint8_t		idx;
+	uint32_t	idx;
 
 	/** Size of register */
 	uint8_t		byte_size;
@@ -57,7 +57,7 @@ struct xtensa_register {
 	 * Offset of saved register in stack frame.
 	 * 0 if not saved in stack frame.
 	 */
-	int8_t		stack_offset;
+	int16_t		stack_offset;
 
 	/** Sequence number */
 	uint8_t		seqno;
@@ -102,6 +102,9 @@ struct gdb_ctx {
 
 	/** Index in register descriptions of AR0 register */
 	uint8_t			ar_idx;
+
+	/** Index in register descriptions of PS register */
+	uint8_t			ps_idx;
 };
 
 /**

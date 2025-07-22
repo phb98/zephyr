@@ -30,6 +30,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/pm/policy.h>
+#include <zephyr/pm/device.h>
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/spinlock.h>
 #include <zephyr/irq.h>
@@ -367,10 +368,6 @@ struct uart_ns16550_dev_data {
 	uint8_t iir_cache;	/**< cache of IIR since it clears when read */
 	uart_irq_callback_user_data_t cb;  /**< Callback function pointer */
 	void *cb_data;	/**< Callback function arg */
-#endif
-
-#ifdef CONFIG_UART_NS16550_WA_TX_FIFO_EMPTY_INTERRUPT
-	uint8_t sw_tx_irq; /**< software tx ready flag */
 #endif
 
 #if UART_NS16550_DLF_ENABLED
@@ -736,6 +733,22 @@ out:
 	return ret;
 };
 
+__maybe_unused static int uart_ns16550_pm_action(const struct device *dev,
+						 enum pm_device_action action)
+{
+	struct uart_ns16550_dev_data *data = dev->data;
+	struct uart_config *uart_cfg = &data->uart_config;
+
+	switch (action) {
+	case PM_DEVICE_ACTION_RESUME:
+		return uart_ns16550_configure(dev, uart_cfg);
+	case PM_DEVICE_ACTION_SUSPEND:
+		return 0;
+	default:
+		return -ENOTSUP;
+	}
+}
+
 #ifdef CONFIG_UART_USE_RUNTIME_CONFIGURE
 static int uart_ns16550_config_get(const struct device *dev,
 				   struct uart_config *cfg)
@@ -937,10 +950,6 @@ static void uart_ns16550_poll_out(const struct device *dev,
 
 	ns16550_outbyte(dev_cfg, THR(dev), c);
 
-#ifdef CONFIG_UART_NS16550_WA_TX_FIFO_EMPTY_INTERRUPT
-	data->sw_tx_irq = 0; /**< clean up */
-#endif
-
 	k_spin_unlock(&data->lock, key);
 }
 
@@ -987,12 +996,6 @@ static int uart_ns16550_fifo_fill(const struct device *dev,
 	for (i = 0; (i < size) && (i < data->fifo_size); i++) {
 		ns16550_outbyte(dev_cfg, THR(dev), tx_data[i]);
 	}
-
-#ifdef CONFIG_UART_NS16550_WA_TX_FIFO_EMPTY_INTERRUPT
-	if (i != 0) {
-		data->sw_tx_irq = 0; /**< clean up */
-	}
-#endif
 
 	k_spin_unlock(&data->lock, key);
 
@@ -1056,26 +1059,6 @@ static void uart_ns16550_irq_tx_enable(const struct device *dev)
 #endif
 	ns16550_outbyte(dev_cfg, IER(dev), ns16550_inbyte(dev_cfg, IER(dev)) | IER_TBE);
 
-#ifdef CONFIG_UART_NS16550_WA_TX_FIFO_EMPTY_INTERRUPT
-	if (ns16550_inbyte(dev_cfg, LSR(dev)) & LSR_THRE) {
-		k_spin_unlock(&data->lock, key);
-		/*
-		 * The TX FIFO ready interrupt will be triggered if only if
-		 * when the pre-state is not empty. Thus, if the pre-state is
-		 * already empty, try to call the callback routine directly
-		 * to resolve it.
-		 */
-		int irq_lock_key = arch_irq_lock();
-
-		if (data->cb && (ns16550_inbyte(dev_cfg, LSR(dev)) & LSR_THRE)) {
-			data->sw_tx_irq = 1; /**< set tx ready */
-			data->cb(dev, data->cb_data);
-		}
-		arch_irq_unlock(irq_lock_key);
-		return;
-	}
-#endif
-
 	k_spin_unlock(&data->lock, key);
 }
 
@@ -1089,10 +1072,6 @@ static void uart_ns16550_irq_tx_disable(const struct device *dev)
 	struct uart_ns16550_dev_data *data = dev->data;
 	const struct uart_ns16550_dev_config * const dev_cfg = dev->config;
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
-
-#ifdef CONFIG_UART_NS16550_WA_TX_FIFO_EMPTY_INTERRUPT
-	data->sw_tx_irq = 0; /**< clean up */
-#endif
 
 	ns16550_outbyte(dev_cfg, IER(dev),
 			ns16550_inbyte(dev_cfg, IER(dev)) & (~IER_TBE));
@@ -1133,17 +1112,6 @@ static int uart_ns16550_irq_tx_ready(const struct device *dev)
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
 
 	int ret = ((IIRC(dev) & IIR_ID) == IIR_THRE) ? 1 : 0;
-
-#ifdef CONFIG_UART_NS16550_WA_TX_FIFO_EMPTY_INTERRUPT
-	if (ret == 0 && data->sw_tx_irq) {
-		/**< replace resoult when there is a software solution */
-		const struct uart_ns16550_dev_config * const dev_cfg = dev->config;
-
-		if (ns16550_inbyte(dev_cfg, IER(dev)) & IER_TBE) {
-			ret = 1;
-		}
-	}
-#endif
 
 	k_spin_unlock(&data->lock, key);
 
@@ -2028,7 +1996,8 @@ static DEVICE_API(uart, uart_ns16550_driver_api) = {
 	static struct uart_ns16550_dev_data uart_ns16550_dev_data_##n = {            \
 		UART_NS16550_COMMON_DEV_DATA_INITIALIZER(n)                          \
 	};                                                                           \
-	DEVICE_DT_INST_DEFINE(n, uart_ns16550_init, NULL,                            \
+	PM_DEVICE_DT_INST_DEFINE(n, uart_ns16550_pm_action);                         \
+	DEVICE_DT_INST_DEFINE(n, uart_ns16550_init, PM_DEVICE_DT_INST_GET(n),	     \
 			      &uart_ns16550_dev_data_##n, &uart_ns16550_dev_cfg_##n, \
 			      PRE_KERNEL_1, CONFIG_SERIAL_INIT_PRIORITY,             \
 			      &uart_ns16550_driver_api);                             \
@@ -2046,7 +2015,8 @@ static DEVICE_API(uart, uart_ns16550_driver_api) = {
 	static struct uart_ns16550_dev_data uart_ns16550_dev_data_##n = {            \
 		UART_NS16550_COMMON_DEV_DATA_INITIALIZER(n)                          \
 	};                                                                           \
-	DEVICE_DT_INST_DEFINE(n, uart_ns16550_init, NULL,                            \
+	PM_DEVICE_DT_INST_DEFINE(n, uart_ns16550_pm_action);			     \
+	DEVICE_DT_INST_DEFINE(n, uart_ns16550_init, PM_DEVICE_DT_INST_GET(n),	     \
 			      &uart_ns16550_dev_data_##n, &uart_ns16550_dev_cfg_##n, \
 			      PRE_KERNEL_1,            \
 			      CONFIG_SERIAL_INIT_PRIORITY,                           \

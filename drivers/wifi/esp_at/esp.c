@@ -494,7 +494,7 @@ static void esp_dns_work(struct k_work *work)
 	size_t i;
 	int err, ifindex;
 
-	ifindex = net_if_get_by_ifindex(data->net_iface);
+	ifindex = net_if_get_by_iface(data->net_iface);
 
 	for (i = 0; i < ESP_MAX_DNS; i++) {
 		if (!addrs[i].sin_addr.s_addr) {
@@ -506,7 +506,8 @@ static void esp_dns_work(struct k_work *work)
 
 	dnsctx = dns_resolve_get_default();
 	err = dns_resolve_reconfigure_with_interfaces(dnsctx, NULL, dns_servers,
-						      interfaces);
+						      interfaces,
+						      DNS_SOURCE_MANUAL);
 	if (err) {
 		LOG_ERR("Could not set DNS servers: %d", err);
 	}

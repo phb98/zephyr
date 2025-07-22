@@ -1611,11 +1611,11 @@ static void endrx_isr(const struct device *dev)
 		}
 
 		irq_unlock(key);
-		if (IS_ENABLED(UARTE_HAS_FRAME_TIMEOUT)) {
-			if (start_timeout && !K_TIMEOUT_EQ(async_rx->timeout, K_NO_WAIT)) {
-				k_timer_start(&async_rx->timer, async_rx->timeout, K_NO_WAIT);
-			}
+#ifdef UARTE_HAS_FRAME_TIMEOUT
+		if (start_timeout && !K_TIMEOUT_EQ(async_rx->timeout, K_NO_WAIT)) {
+			k_timer_start(&async_rx->timer, async_rx->timeout, K_NO_WAIT);
 		}
+#endif
 	}
 
 #if !defined(CONFIG_UART_NRFX_UARTE_ENHANCED_RX)
@@ -2489,6 +2489,11 @@ static int uarte_instance_init(const struct device *dev,
 		/* For simulation the DT provided peripheral address needs to be corrected */
 		((struct pinctrl_dev_config *)cfg->pcfg)->reg = (uintptr_t)cfg->uarte_regs;
 	}
+
+	/* Apply sleep state by default.
+	 * If PM is disabled, the default state will be applied in pm_device_driver_init.
+	 */
+	(void)pinctrl_apply_state(cfg->pcfg, PINCTRL_STATE_SLEEP);
 
 #ifdef CONFIG_UART_USE_RUNTIME_CONFIGURE
 	err = uarte_nrfx_configure(dev, &((struct uarte_nrfx_data *)dev->data)->uart_config);

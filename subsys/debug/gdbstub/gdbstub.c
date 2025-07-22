@@ -38,11 +38,11 @@ LOG_MODULE_REGISTER(gdbstub);
 
 static bool not_first_start;
 
-/* Empty memory region array */
-__weak const struct gdb_mem_region gdb_mem_region_array[0];
-
 /* Number of memory regions */
 __weak const size_t gdb_mem_num_regions;
+
+/* Fall-back memory region array */
+__weak const struct gdb_mem_region gdb_mem_region_array[1];
 
 /**
  * Given a starting address and length of a memory block, find a memory
@@ -891,6 +891,7 @@ int gdb_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_GDBSTUB_ENTER_IMMEDIATELY
 #ifdef CONFIG_XTENSA
 /*
  * Interrupt stacks are being setup during init and are not
@@ -903,4 +904,5 @@ int gdb_init(void)
 SYS_INIT(gdb_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 #else
 SYS_INIT(gdb_init, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+#endif
 #endif

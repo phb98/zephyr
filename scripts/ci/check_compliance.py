@@ -10,7 +10,7 @@ from itertools import takewhile
 import json
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import platform
 import re
 import subprocess
@@ -30,6 +30,11 @@ import magic
 
 from west.manifest import Manifest
 from west.manifest import ManifestProject
+
+try:
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    from yaml import SafeLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from get_maintainer import Maintainers, MaintainersError
@@ -286,37 +291,37 @@ class CheckPatch(ComplianceTest):
             cmd = [checkpatch]
 
         cmd.extend(['--mailback', '--no-tree', '-'])
-        diff = subprocess.Popen(('git', 'diff', '--no-ext-diff', COMMIT_RANGE),
+        with subprocess.Popen(('git', 'diff', '--no-ext-diff', COMMIT_RANGE),
                                 stdout=subprocess.PIPE,
-                                cwd=GIT_TOP)
-        try:
-            subprocess.run(cmd,
-                           check=True,
-                           stdin=diff.stdout,
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT,
-                           shell=False, cwd=GIT_TOP)
+                                cwd=GIT_TOP) as diff:
+            try:
+                subprocess.run(cmd,
+                               check=True,
+                               stdin=diff.stdout,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT,
+                               shell=False, cwd=GIT_TOP)
 
-        except subprocess.CalledProcessError as ex:
-            output = ex.output.decode("utf-8")
-            regex = r'^\s*\S+:(\d+):\s*(ERROR|WARNING):(.+?):(.+)(?:\n|\r\n?)+' \
-                    r'^\s*#(\d+):\s*FILE:\s*(.+):(\d+):'
+            except subprocess.CalledProcessError as ex:
+                output = ex.output.decode("utf-8")
+                regex = r'^\s*\S+:(\d+):\s*(ERROR|WARNING):(.+?):(.+)(?:\n|\r\n?)+' \
+                        r'^\s*#(\d+):\s*FILE:\s*(.+):(\d+):'
 
-            matches = re.findall(regex, output, re.MULTILINE)
+                matches = re.findall(regex, output, re.MULTILINE)
 
-            # add a guard here for excessive number of errors, do not try and
-            # process each one of them and instead push this as one failure.
-            if len(matches) > 500:
-                self.failure(output)
-                return
+                # add a guard here for excessive number of errors, do not try and
+                # process each one of them and instead push this as one failure.
+                if len(matches) > 500:
+                    self.failure(output)
+                    return
 
-            for m in matches:
-                self.fmtd_failure(m[1].lower(), m[2], m[5], m[6], col=None,
-                        desc=m[3])
+                for m in matches:
+                    self.fmtd_failure(m[1].lower(), m[2], m[5], m[6], col=None,
+                            desc=m[3])
 
-            # If the regex has not matched add the whole output as a failure
-            if len(matches) == 0:
-                self.failure(output)
+                # If the regex has not matched add the whole output as a failure
+                if len(matches) == 0:
+                    self.failure(output)
 
 
 class BoardYmlCheck(ComplianceTest):
@@ -751,6 +756,23 @@ class KconfigCheck(ComplianceTest):
 
         return set(kconf_syms)
 
+    def module_disallowed_check(self, module_path, type, folder, meta, regex):
+        # Returns a list with lines from git grep which includes Kconfigs from defconfig files
+        entry = type + '_root'
+        git_folder = ":" + folder
+
+        if entry in meta['build']['settings']:
+            tmp_path = module_path.joinpath(meta['build']['settings'][entry])
+
+            if Path(tmp_path.joinpath(folder)).is_dir():
+                tmp_output = git("grep", "--line-number", "-I", "--null",
+                                 "--perl-regexp", regex, "--", git_folder,
+                                 cwd=tmp_path, ignore_non_zero=True)
+
+                if len(tmp_output) > 0:
+                    return tmp_output.splitlines()
+        return []
+
     def check_disallowed_defconfigs(self, kconf):
         """
         Checks that there are no disallowed Kconfigs used in board/SoC defconfig files
@@ -799,14 +821,41 @@ class KconfigCheck(ComplianceTest):
 
         grep_stdout_boards = git("grep", "--line-number", "-I", "--null",
                                  "--perl-regexp", regex_boards, "--", ":boards",
-                                 cwd=ZEPHYR_BASE)
+                                 cwd=ZEPHYR_BASE).splitlines()
         grep_stdout_socs = git("grep", "--line-number", "-I", "--null",
                                "--perl-regexp", regex_socs, "--", ":soc",
-                               cwd=ZEPHYR_BASE)
+                               cwd=ZEPHYR_BASE).splitlines()
+
+        manifest = Manifest.from_file()
+        for project in manifest.get_projects([]):
+            if not manifest.is_active(project):
+                continue
+
+            if not project.is_cloned():
+                continue
+
+            module_path = PurePath(project.abspath)
+            module_yml = module_path.joinpath('zephyr/module.yml')
+
+            if not Path(module_yml).is_file():
+                module_yml = module_path.joinpath('zephyr/module.yaml')
+
+            if Path(module_yml).is_file():
+                with Path(module_yml).open('r', encoding='utf-8') as f:
+                    meta = yaml.load(f.read(), Loader=SafeLoader)
+
+                    if 'build' in meta and 'settings' in meta['build']:
+                        grep_stdout_boards.extend(self.module_disallowed_check(module_path,
+                                                                               'board',
+                                                                               'boards', meta,
+                                                                               regex_boards))
+                        grep_stdout_socs.extend(self.module_disallowed_check(module_path, 'soc',
+                                                                             'soc', meta,
+                                                                             regex_socs))
 
         # Board processing
         # splitlines() supports various line terminators
-        for grep_line in grep_stdout_boards.splitlines():
+        for grep_line in grep_stdout_boards:
             path, lineno, line = grep_line.split("\0")
 
             # Extract symbol references (might be more than one) within the line
@@ -823,7 +872,7 @@ Found disallowed Kconfig symbol in board Kconfig files: CONFIG_{sym_name:35}
 
         # SoCs processing
         # splitlines() supports various line terminators
-        for grep_line in grep_stdout_socs.splitlines():
+        for grep_line in grep_stdout_socs:
             path, lineno, line = grep_line.split("\0")
 
             # Extract symbol references (might be more than one) within the line
@@ -1094,6 +1143,7 @@ flagged.
         "BOARD_MPS2_AN521_CPUTEST", # Used for board and SoC extension feature tests
         "BOARD_NATIVE_SIM_NATIVE_64_TWO", # Used for board and SoC extension feature tests
         "BOARD_NATIVE_SIM_NATIVE_ONE", # Used for board and SoC extension feature tests
+        "BOARD_UNIT_TESTING",  # Used for tests/unit
         "BOOT_DIRECT_XIP", # Used in sysbuild for MCUboot configuration
         "BOOT_DIRECT_XIP_REVERT", # Used in sysbuild for MCUboot configuration
         "BOOT_ENCRYPTION_KEY_FILE", # Used in sysbuild
@@ -1613,7 +1663,7 @@ class ImageSize(ComplianceTest):
 
         for file in get_files(filter="d"):
             full_path = GIT_TOP / file
-            mime_type = magic.from_file(full_path, mime=True)
+            mime_type = magic.from_file(os.fspath(full_path), mime=True)
 
             if not mime_type.startswith("image/"):
                 continue
@@ -1720,7 +1770,11 @@ class SphinxLint(ComplianceTest):
     doc = "Check Sphinx/reStructuredText files with sphinx-lint."
 
     # Checkers added/removed to sphinx-lint's default set
-    DISABLE_CHECKERS = ["horizontal-tab", "missing-space-before-default-role"]
+    DISABLE_CHECKERS = [
+        "horizontal-tab",
+        "missing-space-before-default-role",
+        "trailing-whitespace",
+    ]
     ENABLE_CHECKERS = ["default-role"]
 
     def run(self):
@@ -1762,7 +1816,7 @@ class KeepSorted(ComplianceTest):
 
     MARKER = "zephyr-keep-sorted"
 
-    def block_check_sorted(self, block_data, regex):
+    def block_check_sorted(self, block_data, *, regex, strip, fold):
         def _test_indent(txt: str):
             return txt.startswith((" ", "\t"))
 
@@ -1785,9 +1839,13 @@ class KeepSorted(ComplianceTest):
                 if _test_indent(line):
                     continue
 
-                # Fold back indented lines after the current one
-                for cont in takewhile(_test_indent, lines[idx + 1:]):
-                    line += cont.strip()
+                if strip is not None:
+                    line = line.strip(strip)
+
+                if fold:
+                    # Fold back indented lines after the current one
+                    for cont in takewhile(_test_indent, lines[idx + 1:]):
+                        line += cont.strip()
 
             if line < last:
                 return idx
@@ -1797,7 +1855,7 @@ class KeepSorted(ComplianceTest):
         return -1
 
     def check_file(self, file, fp):
-        mime_type = magic.from_file(file, mime=True)
+        mime_type = magic.from_file(os.fspath(file), mime=True)
 
         if not mime_type.startswith("text/"):
             return
@@ -1808,8 +1866,12 @@ class KeepSorted(ComplianceTest):
         start_marker = f"{self.MARKER}-start"
         stop_marker = f"{self.MARKER}-stop"
         regex_marker = r"re\((.+)\)"
+        strip_marker = r"strip\((.+)\)"
+        nofold_marker = "nofold"
         start_line = 0
         regex = None
+        strip = None
+        fold = True
 
         for line_num, line in enumerate(fp.readlines(), start=1):
             if start_marker in line:
@@ -1824,6 +1886,11 @@ class KeepSorted(ComplianceTest):
                 # Test for a regex block
                 match = re.search(regex_marker, line)
                 regex = match.group(1) if match else None
+
+                match = re.search(strip_marker, line)
+                strip = match.group(1) if match else None
+
+                fold = nofold_marker not in line
             elif stop_marker in line:
                 if not in_block:
                     desc = f"{stop_marker} without {start_marker}"
@@ -1831,7 +1898,7 @@ class KeepSorted(ComplianceTest):
                                      desc=desc)
                 in_block = False
 
-                idx = self.block_check_sorted(block_data, regex)
+                idx = self.block_check_sorted(block_data, regex=regex, strip=strip, fold=fold)
                 if idx >= 0:
                     desc = f"sorted block has out-of-order line at {start_line + idx}"
                     self.fmtd_failure("error", "KeepSorted", file, line_num,
@@ -1969,7 +2036,7 @@ class TextEncoding(ComplianceTest):
 
         for file in get_files(filter="d"):
             full_path = GIT_TOP / file
-            mime_type = m.from_file(full_path)
+            mime_type = m.from_file(os.fspath(full_path))
 
             if not mime_type.startswith("text/"):
                 continue
@@ -2128,6 +2195,8 @@ def _main(args):
             test.run()
         except EndTest:
             pass
+        except BaseException:
+            test.failure(f"An exception occurred in {test.name}:\n{traceback.format_exc()}")
 
         # Annotate if required
         if args.annotate:

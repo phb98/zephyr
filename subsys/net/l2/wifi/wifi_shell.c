@@ -101,7 +101,9 @@ static const char server_key_test[] = {
 				NET_EVENT_WIFI_AP_ENABLE_RESULT   |\
 				NET_EVENT_WIFI_AP_DISABLE_RESULT  |\
 				NET_EVENT_WIFI_AP_STA_CONNECTED   |\
-				NET_EVENT_WIFI_AP_STA_DISCONNECTED)
+				NET_EVENT_WIFI_AP_STA_DISCONNECTED|\
+				NET_EVENT_WIFI_SIGNAL_CHANGE      |\
+				NET_EVENT_WIFI_NEIGHBOR_REP_COMP)
 
 #ifdef CONFIG_WIFI_MGMT_RAW_SCAN_RESULTS_ONLY
 #define WIFI_SHELL_SCAN_EVENTS (                   \
@@ -3886,7 +3888,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		  "<rts_threshold: rts threshold/off>.\n"
 		  "[-i, --iface=<interface index>] : Interface index.\n",
 		  cmd_wifi_ap_set_rts_threshold,
-		  3,
+		  2,
 		  2),
 	SHELL_SUBCMD_SET_END);
 
