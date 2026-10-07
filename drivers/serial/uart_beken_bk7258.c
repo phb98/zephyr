@@ -114,7 +114,7 @@ struct uart_bk7258_data {
  * Translate line settings into BK_UART_CONFIG bits. The block
  * supports 5 to 8 data bits, no, odd or even parity, and one or two stop bits.
  */
-static int uart_bk7258_line_bits(const struct uart_config *cfg, uint32_t *bits)
+static int uart_bk7258_get_line_bits(const struct uart_config *cfg, uint32_t *bits)
 {
 	uint32_t val = 0U;
 
@@ -178,7 +178,7 @@ static int uart_bk7258_set_line(const struct device *dev, const struct uart_conf
 		return -ENOTSUP;
 	}
 
-	err = uart_bk7258_line_bits(cfg, &line_bits);
+	err = uart_bk7258_get_line_bits(cfg, &line_bits);
 	if (err < 0) {
 		return err;
 	}

@@ -8,6 +8,19 @@ description: |
   selects the source and divider of the clocks derived from the crystal and
   the PLLs.
 
+  Two register regions: "cgu", the selects, dividers and gates, and "ana",
+  the analog SPI status word followed by the analog registers that hold the
+  DPLL and core-voltage settings.
+
+  "clocks" is the source the core clock is taken from, either the crystal or
+  one output of the beken,bk7258-dpll node. "clock-frequency" is the rate CPU0
+  ends up running at: the source divided by core-prescaler, then by
+  cpu0-prescaler. The driver programs what this node says and raises VDDDIG
+  first when the source is the DPLL.
+
+  Only the crystal undivided, which is what the BootROM leaves, and the
+  480 MHz DPLL output with core-prescaler = <2> have been run on hardware.
+
   The clock specifier has one cell, the clock ID. Clock IDs are defined in
   include/zephyr/dt-bindings/clock/beken_bk7258_clock.h.
 
@@ -19,10 +32,34 @@ properties:
   reg:
     required: true
 
+  reg-names:
+    required: true
+
+  clocks:
+    required: true
+
   clock-frequency:
     type: int
     required: true
-    description: Frequency of the crystal driving the SoC, in Hz.
+    description: |
+      The rate CPU0 runs at once this node is programmed, in Hz. It must equal
+      the source rate divided by core-prescaler and then by cpu0-prescaler,
+      and the clock-frequency of /cpus/cpu@0; the build fails otherwise.
+
+  core-prescaler:
+    type: int
+    required: true
+    enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    description: |
+      Divider from the source to the core and bus clock. The bus clock tops
+      out at 240 MHz, so the 480 MHz DPLL output needs at least 2 here.
+
+  cpu0-prescaler:
+    type: int
+    required: true
+    enum: [1, 2]
+    description: |
+      Divider from the core clock to CPU0. CPU0 tops out at 240 MHz.
 
   "#clock-cells":
     const: 1
@@ -32,11 +69,16 @@ clock-cells:
 
 examples:
   - |
-    cgu: clock-controller@44010000 {
-        compatible = "beken,bk7258-cgu";
-        reg = <0x44010000 0x40>;
-        clock-frequency = <DT_FREQ_M(26)>;
-        #clock-cells = <1>;
+    /* CPU0 at 240 MHz: the 480 MHz DPLL output halved */
+    &dpll {
+        status = "okay";
+    };
+
+    &cgu {
+        clocks = <&dpll BK7258_DPLL_480M>;
+        clock-frequency = <DT_FREQ_M(240)>;
+        core-prescaler = <2>;
+        cpu0-prescaler = <1>;
     };
 
     uart0: serial@44820000 {

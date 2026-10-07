@@ -20,6 +20,14 @@
  * chip has one encoder and one decoder, so 40 is the decoder's.
  */
 
+/*
+ * Outputs of the beken,bk7258-dpll node, for the cell of its clock specifier.
+ * Both come from the one DPLL; the values are what cksel_core takes to select
+ * them as the core clock's source.
+ */
+#define BK7258_DPLL_320M 2
+#define BK7258_DPLL_480M 3
+
 /* SYS word 0x0c, SYS_CPU_DEVICE_CLK_ENABLE_*_CKEN_POS: bit = id */
 #define BK7258_CLK_I2C0     0
 #define BK7258_CLK_SPI0     1

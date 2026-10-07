@@ -1,0 +1,27 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Beken BK7258 DPLL.
+
+  The digital PLL, driven by the crystal. It has two fixed outputs,
+  320 MHz and 480 MHz, and the clock specifier's single cell selects between
+  them. The BootROM leaves it powered down; the clock controller brings it up
+  when it is the core clock's source.
+
+  Enabling this node does not by itself start the DPLL. Something has to
+  select one of its outputs, as the clock controller's "clocks" property does.
+
+compatible: "beken,bk7258-dpll"
+
+include: [clock-controller.yaml, base.yaml]
+
+properties:
+  "#clock-cells":
+    const: 1
+
+  clocks:
+    required: true
+
+clock-cells:
+  - output
