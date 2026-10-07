@@ -20,15 +20,37 @@
 		#size-cells = <0>;
 
 		/*
-		 * The BootROM leaves the core on the 26 MHz crystal and
-		 * Zephyr is started directly by the ROM, so this is the rate
-		 * the core runs at and SysTick counts.
+		 * The rate SysTick counts, which has to agree with what the
+		 * clock controller is told to program; the driver asserts
+		 * that at build time. This is what the BootROM leaves, since
+		 * Zephyr is started directly by the ROM.
 		 */
-		cpu@0 {
+		cpu0: cpu@0 {
 			device_type = "cpu";
 			compatible = "arm,cortex-m33";
 			reg = <0>;
 			clock-frequency = <DT_FREQ_M(26)>;
+		};
+	};
+
+	clocks {
+		/*
+		 * The crystal every board carries, and the DPLL. The DPLL is
+		 * left powered down by the BootROM, so a board that wants it
+		 * enables it and points the clock controller at the output it
+		 * wants.
+		 */
+		clk_xtal: clk-xtal {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <DT_FREQ_M(26)>;
+		};
+
+		dpll: dpll {
+			#clock-cells = <1>;
+			compatible = "beken,bk7258-dpll";
+			clocks = <&clk_xtal>;
+			status = "disabled";
 		};
 	};
 
@@ -75,10 +97,24 @@
 			reg-names = "pad", "func";
 		};
 
+		/*
+		 * Clock selects, dividers and gates, then the analog block:
+		 * the analog SPI status word followed by the registers that
+		 * hold the DPLL and core-voltage settings.
+		 *
+		 * "clocks" is the core clock's source and "clock-frequency"
+		 * the rate CPU0 ends up at, which is the source divided by
+		 * core-prescaler and then by cpu0-prescaler. This is what the
+		 * BootROM leaves: the crystal, undivided.
+		 */
 		cgu: clock-controller@44010000 {
 			compatible = "beken,bk7258-cgu";
-			reg = <0x44010000 0x40>;
+			reg = <0x44010000 0x40>, <0x440100e8 0x40>;
+			reg-names = "cgu", "ana";
+			clocks = <&clk_xtal>;
 			clock-frequency = <DT_FREQ_M(26)>;
+			core-prescaler = <1>;
+			cpu0-prescaler = <1>;
 			#clock-cells = <1>;
 		};
 
