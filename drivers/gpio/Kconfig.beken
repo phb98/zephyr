@@ -1,0 +1,9 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+config GPIO_BEKEN_BK7258
+	bool "Beken BK7258 GPIO driver"
+	default y
+	depends on DT_HAS_BEKEN_BK7258_GPIO_ENABLED
+	help
+	  This option enables the Beken BK7258 GPIO driver.

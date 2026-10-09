@@ -95,6 +95,31 @@
 			compatible = "beken,bk7258-pinctrl";
 			reg = <0x44000400 0xe0>, <0x440100c0 0x1c>;
 			reg-names = "pad", "func";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			gpio0: gpio@44000400 {
+				compatible = "beken,bk7258-gpio";
+				reg = <0x44000400 0x80>, <0x44000500 0x4>;
+				reg-names = "pad", "int_status";
+				interrupts = <55 3>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <32>;
+				status = "disabled";
+			};
+
+			gpio1: gpio@44000480 {
+				compatible = "beken,bk7258-gpio";
+				reg = <0x44000480 0x60>, <0x44000504 0x4>;
+				reg-names = "pad", "int_status";
+				interrupts = <55 3>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <24>;
+				status = "disabled";
+			};
 		};
 
 		/*
