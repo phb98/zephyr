@@ -91,3 +91,11 @@
 	pinctrl-0 = <&uart0_tx_p11 &uart0_rx_p10>;
 	pinctrl-names = "default";
 };
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
