@@ -7,22 +7,20 @@
 #include <zephyr/cache.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
+#include <bk7258_aon.h>
 #include <soc.h>
 
 /*
  * Addresses are the secure aliases, which is what the BootROM leaves the core
  * running in. The non-secure alias of any peripheral is at +0x10000000.
  */
-#define BK7258_AON_WDT_BASE 0x44000600
-#define BK7258_WDT_BASE     0x44800000
+#define BK7258_WDT_BASE 0x44800000
 
 /* CPU0's interrupt gate: sources 0 to 31, then 32 to 63 */
 #define BK7258_SYS_CPU0_INT_EN 0x44010080
 
-/* Both watchdogs share a control register: period in bits 15:0, key in 23:16 */
+/* NMI watchdog control, laid out as the AON watchdog's */
 #define BK7258_WDT_CTRL_OFFSET 0x10
-#define BK7258_WDT_KEY_FIRST   0x5a0000
-#define BK7258_WDT_KEY_SECOND  0xa50000
 
 /* NMI watchdog global control */
 #define BK7258_WDT_GLOBAL_CTRL_OFFSET   0x08
@@ -36,13 +34,16 @@
  */
 static void watchdog_disable(void)
 {
-	sys_write32(BK7258_WDT_KEY_FIRST, BK7258_AON_WDT_BASE);
-	sys_write32(BK7258_WDT_KEY_SECOND, BK7258_AON_WDT_BASE);
+	const uint32_t key_1st = FIELD_PREP(BK7258_AON_WDT_CTRL_KEY, BK7258_AON_WDT_KEY_1ST);
+	const uint32_t key_2nd = FIELD_PREP(BK7258_AON_WDT_CTRL_KEY, BK7258_AON_WDT_KEY_2ND);
+
+	sys_write32(key_1st, BK7258_AON_WDT_CTRL);
+	sys_write32(key_2nd, BK7258_AON_WDT_CTRL);
 
 	sys_set_bits(BK7258_WDT_BASE + BK7258_WDT_GLOBAL_CTRL_OFFSET,
 		     BK7258_WDT_CLK_GATE_BYPASS);
-	sys_write32(BK7258_WDT_KEY_FIRST, BK7258_WDT_BASE + BK7258_WDT_CTRL_OFFSET);
-	sys_write32(BK7258_WDT_KEY_SECOND, BK7258_WDT_BASE + BK7258_WDT_CTRL_OFFSET);
+	sys_write32(key_1st, BK7258_WDT_BASE + BK7258_WDT_CTRL_OFFSET);
+	sys_write32(key_2nd, BK7258_WDT_BASE + BK7258_WDT_CTRL_OFFSET);
 }
 
 static struct k_spinlock irq_gate_lock;
