@@ -1,0 +1,51 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+DT_BK7258_FC := $(DT_COMPAT_BEKEN_BK7258_FLASH_CONTROLLER)
+
+config FLASH_BEKEN_BK7258
+	bool "Beken BK7258 flash driver"
+	default y
+	depends on DT_HAS_BEKEN_BK7258_FLASH_CONTROLLER_ENABLED
+	select FLASH_HAS_DRIVER_ENABLED
+	select FLASH_HAS_EXPLICIT_ERASE
+	select FLASH_HAS_PAGE_LAYOUT
+	help
+	  This option enables the Beken BK7258 flash driver.
+
+if FLASH_BEKEN_BK7258
+
+choice FLASH_BEKEN_BK7258_MODE
+	prompt "Flash SPI mode"
+	default FLASH_BEKEN_BK7258_MODE_DUAL
+	help
+	  Line mode of flash reads, execute-in-place included, set when the
+	  driver initializes. Until then reads are single line. Dual is the
+	  default where the flash controller node allows it.
+
+config FLASH_BEKEN_BK7258_MODE_SINGLE
+	bool "Single"
+
+config FLASH_BEKEN_BK7258_MODE_DUAL
+	bool "Dual"
+	depends on $(dt_compat_any_has_prop,$(DT_BK7258_FC),spi-bus-width,2) || \
+		   $(dt_compat_any_has_prop,$(DT_BK7258_FC),spi-bus-width,4)
+	help
+	  Needs spi-bus-width 2 or 4 on the flash controller node.
+
+config FLASH_BEKEN_BK7258_MODE_QUAD
+	bool "Quad"
+	depends on $(dt_compat_any_has_prop,$(DT_BK7258_FC),spi-bus-width,4)
+	depends on $(dt_compat_any_has_prop,$(DT_BK7258_FC),quad-enable-requirements)
+	depends on !$(dt_compat_any_has_prop,$(DT_BK7258_FC),quad-enable-requirements,S2B7)
+	depends on $(dt_compat_any_has_prop,$(DT_BK7258_FC),quad-mode-bits)
+	help
+	  Needs spi-bus-width 4, quad-enable-requirements other than S2B7 and
+	  quad-mode-bits on the flash controller node, and the flash's quad
+	  enable bit set; with the bit clear, reads are dual. A core reset,
+	  such as sys_reboot(), leaves the flash in a state the BootROM cannot
+	  boot from, until a reset by the reset pin or a power cycle.
+
+endchoice
+
+endif # FLASH_BEKEN_BK7258

@@ -17,6 +17,7 @@
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
 		zephyr,code-partition = &slot0_partition;
+		zephyr,flash-controller = &flash_controller;
 	};
 };
 
@@ -70,6 +71,13 @@
 			reg = <0x440000 0x3c0000>;
 		};
 	};
+};
+
+&flash_controller {
+	spi-bus-width = <4>;
+	has-lock = <0x7c>;
+	quad-enable-requirements = "S2B1v4";
+	quad-mode-bits = <0xa0>;
 };
 
 &pinctrl {

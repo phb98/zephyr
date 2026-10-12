@@ -5,4 +5,22 @@ description: Beken BK7258 flash controller
 
 compatible: "beken,bk7258-flash-controller"
 
-include: flash-controller.yaml
+include: ["flash-controller.yaml", "jedec,spi-nor-common.yaml"]
+
+properties:
+  spi-bus-width:
+    type: int
+    enum:
+      - 1
+      - 2
+      - 4
+    description: |
+      Number of data lines the flash can be read on. Dual reads need 2 or 4,
+      quad reads needs 4.
+
+  quad-mode-bits:
+    type: int
+    description: |
+      Mode bits sent after the address of a quad read. The controller's quad
+      reads leave out the opcode after the first, so these must put the
+      flash in continuous read: 0xa0 on GigaDevice and Winbond parts.
