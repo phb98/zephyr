@@ -1,0 +1,11 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+config ENTROPY_BEKEN_BK7258_TRNG
+	bool "Beken BK7258 TRNG driver"
+	default y
+	depends on DT_HAS_BEKEN_BK7258_TRNG_ENABLED
+	select ENTROPY_HAS_DRIVER
+	help
+	  This option enables the true random number generator of the Beken
+	  BK7258.

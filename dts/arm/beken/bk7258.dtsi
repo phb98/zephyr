@@ -125,6 +125,12 @@
 			clocks = <&cgu BK7258_CLK_UART0>;
 			status = "disabled";
 		};
+
+		trng: rng@458c0000 {
+			compatible = "beken,bk7258-trng";
+			reg = <0x458c0000 0x18>;
+			status = "disabled";
+		};
 	};
 };
 
