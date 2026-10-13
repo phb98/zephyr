@@ -9,5 +9,6 @@ config SOC_BK7258
 	select CPU_HAS_ARM_MPU
 	select CPU_HAS_ARM_SAU
 	select CPU_HAS_FPU
+	select CPU_HAS_ICACHE
 	select PINCTRL
 	select SOC_EARLY_INIT_HOOK

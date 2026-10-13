@@ -14,6 +14,9 @@ config SYS_CLOCK_HW_CYCLES_PER_SEC
 config INIT_ARCH_HW_AT_BOOT
 	default y
 
+configdefault CACHE_MANAGEMENT
+	default y
+
 config BUILD_OUTPUT_BIN
 	default y
 

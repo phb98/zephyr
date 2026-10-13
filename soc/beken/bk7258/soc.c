@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/cache.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 #include <soc.h>
@@ -60,4 +61,7 @@ void bk7258_irq_gate_enable(unsigned int irq)
 void soc_early_init_hook(void)
 {
 	watchdog_disable();
+
+	/* The BootROM hands over with the caches off */
+	sys_cache_instr_enable();
 }
