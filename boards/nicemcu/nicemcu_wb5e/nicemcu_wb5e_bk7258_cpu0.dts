@@ -7,6 +7,7 @@
 /dts-v1/;
 
 #include <beken/bk7258.dtsi>
+#include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/pinctrl/beken-bk7258-pinctrl.h>
 
 / {
@@ -82,6 +83,19 @@
 		pinmux = <BK7258_PINMUX(11, FUNC0)>;
 		bias-pull-up;
 	};
+
+	spi0_sck_p33: spi0_sck_p33 {
+		pinmux = <BK7258_PINMUX(33, FUNC4)>;
+	};
+
+	spi0_mosi_p35: spi0_mosi_p35 {
+		pinmux = <BK7258_PINMUX(35, FUNC4)>;
+	};
+
+	spi0_miso_p36: spi0_miso_p36 {
+		pinmux = <BK7258_PINMUX(36, FUNC4)>;
+		bias-pull-up;
+	};
 };
 
 /* UART0 is on GPIO11 (TX) and GPIO10 (RX) */
@@ -98,4 +112,12 @@
 
 &gpio1 {
 	status = "okay";
+};
+
+/* SPI0 on GPIO33 (SCK), GPIO35 (MOSI) and GPIO36 (MISO), chip select on GPIO34 */
+&spi0 {
+	status = "okay";
+	pinctrl-0 = <&spi0_sck_p33 &spi0_mosi_p35 &spi0_miso_p36>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
 };

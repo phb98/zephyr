@@ -1,0 +1,10 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+config SPI_BEKEN_BK7258
+	bool "Beken BK7258 SPI driver"
+	default y
+	depends on DT_HAS_BEKEN_BK7258_SPI_ENABLED
+	select PINCTRL
+	help
+	  This option enables the Beken BK7258 SPI driver.
