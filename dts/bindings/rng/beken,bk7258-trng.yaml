@@ -1,0 +1,14 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+title: Beken BK7258 true random number generator
+
+description: Hardware random number generator; every read of its data register returns a new word.
+
+compatible: "beken,bk7258-trng"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true
