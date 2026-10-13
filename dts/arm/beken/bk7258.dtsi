@@ -150,6 +150,26 @@
 			clocks = <&cgu BK7258_CLK_UART0>;
 			status = "disabled";
 		};
+
+		spi0: spi@44870000 {
+			compatible = "beken,bk7258-spi";
+			reg = <0x44870000 0x20>;
+			interrupts = <7 3>;
+			clocks = <&cgu BK7258_CLK_SPI0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
+
+		spi1: spi@45880000 {
+			compatible = "beken,bk7258-spi";
+			reg = <0x45880000 0x20>;
+			interrupts = <17 3>;
+			clocks = <&cgu BK7258_CLK_SPI1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
 	};
 };
 

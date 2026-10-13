@@ -22,6 +22,7 @@ LOG_MODULE_REGISTER(clock_control_bk7258, CONFIG_CLOCK_CONTROL_LOG_LEVEL);
  */
 #define SYS_CPU0_INT_HALT_CLK_OP 0x10
 #define SYS_CLK_DIV_MODE1        0x20
+#define SYS_CLK_DIV_26M_WDT      0x28
 #define SYS_ANASPI_FREQ          0x2c
 #define SYS_DEVICE_CLK_ENABLE    0x30
 #define SYS_DEVICE_CLK_ENABLE1   0x34
@@ -74,6 +75,10 @@ LOG_MODULE_REGISTER(clock_control_bk7258, CONFIG_CLOCK_CONTROL_LOG_LEVEL);
 #define CKSEL_UART1  BIT(13)
 #define CLKDIV_UART2 GENMASK(15, 14)
 #define CKSEL_UART2  BIT(16)
+
+/* SYS_CLK_DIV_26M_WDT */
+#define CKSEL_SPI0 BIT(4)
+#define CKSEL_SPI1 BIT(5)
 
 /* Highest clock that has a gate bit */
 #define BK7258_CLK_GATED_MAX BK7258_CLK_CIS_AUXS
@@ -227,18 +232,35 @@ static int bk7258_get_cpu0_clock(const struct device *dev, uint32_t mode1, uint3
 	return 0;
 }
 
-/* Source select and divider fields of a UART clock, or 0 for any other clock */
-static uint32_t bk7258_get_uart_clock_fields(uint32_t id)
+/*
+ * Source select and divider fields of a UART or SPI clock, and the SYS word
+ * that holds them. With the fields clear, the clock is the crystal, undivided.
+ */
+static int bk7258_get_clock_fields(uint32_t id, uint32_t *offset, uint32_t *fields)
 {
 	switch (id) {
 	case BK7258_CLK_UART0:
-		return CKSEL_UART0 | CLKDIV_UART0;
+		*offset = SYS_CLK_DIV_MODE1;
+		*fields = CKSEL_UART0 | CLKDIV_UART0;
+		return 0;
 	case BK7258_CLK_UART1:
-		return CKSEL_UART1 | CLKDIV_UART1;
+		*offset = SYS_CLK_DIV_MODE1;
+		*fields = CKSEL_UART1 | CLKDIV_UART1;
+		return 0;
 	case BK7258_CLK_UART2:
-		return CKSEL_UART2 | CLKDIV_UART2;
+		*offset = SYS_CLK_DIV_MODE1;
+		*fields = CKSEL_UART2 | CLKDIV_UART2;
+		return 0;
+	case BK7258_CLK_SPI0:
+		*offset = SYS_CLK_DIV_26M_WDT;
+		*fields = CKSEL_SPI0;
+		return 0;
+	case BK7258_CLK_SPI1:
+		*offset = SYS_CLK_DIV_26M_WDT;
+		*fields = CKSEL_SPI1;
+		return 0;
 	default:
-		return 0U;
+		return -ENOTSUP;
 	}
 }
 
@@ -246,18 +268,21 @@ static int bk7258_cgu_gate(const struct device *dev, uint32_t id, bool enable)
 {
 	const struct bk7258_cgu_config *config = dev->config;
 	uintptr_t reg = config->base + SYS_DEVICE_CLK_ENABLE;
-	uint32_t uart_fields = bk7258_get_uart_clock_fields(id);
 	k_spinlock_key_t key;
+	uint32_t offset;
+	uint32_t fields;
+	int err;
 
-	/* Only the UART clocks are switched */
-	if (uart_fields == 0U) {
-		return -ENOTSUP;
+	/* Handles the UART and SPI clock gates */
+	err = bk7258_get_clock_fields(id, &offset, &fields);
+	if (err < 0) {
+		return err;
 	}
 
 	key = k_spin_lock(&bk7258_cgu_lock);
 
 	if (enable) {
-		sys_clear_bits(config->base + SYS_CLK_DIV_MODE1, uart_fields);
+		sys_clear_bits(config->base + offset, fields);
 		sys_set_bits(reg, BIT(id));
 	} else {
 		sys_clear_bits(reg, BIT(id));
@@ -338,6 +363,21 @@ static int bk7258_get_uart_clock(uint32_t mode1, uint32_t id, uint32_t *rate)
 	return 0;
 }
 
+/* An SPI clock is the crystal, or the audio PLL, whose rate is not modelled */
+static int bk7258_get_spi_clock(const struct device *dev, uint32_t id, uint32_t *rate)
+{
+	const struct bk7258_cgu_config *config = dev->config;
+	uint32_t cksel = (id == BK7258_CLK_SPI0) ? CKSEL_SPI0 : CKSEL_SPI1;
+
+	if ((sys_read32(config->base + SYS_CLK_DIV_26M_WDT) & cksel) != 0U) {
+		return -ENOTSUP;
+	}
+
+	*rate = XTAL_FREQ;
+
+	return 0;
+}
+
 static int bk7258_cgu_get_rate(const struct device *dev, clock_control_subsys_t sys, uint32_t *rate)
 {
 	const struct bk7258_cgu_config *config = dev->config;
@@ -356,6 +396,9 @@ static int bk7258_cgu_get_rate(const struct device *dev, clock_control_subsys_t 
 	case BK7258_CLK_UART1:
 	case BK7258_CLK_UART2:
 		return bk7258_get_uart_clock(mode1, id, rate);
+	case BK7258_CLK_SPI0:
+	case BK7258_CLK_SPI1:
+		return bk7258_get_spi_clock(dev, id, rate);
 	default:
 		return -ENOTSUP;
 	}
