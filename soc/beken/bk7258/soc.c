@@ -62,6 +62,7 @@ void soc_early_init_hook(void)
 {
 	watchdog_disable();
 
-	/* The BootROM hands over with the caches off */
+	/* The BootROM hands over with the caches off; the MPU already keeps SRAM uncached */
 	sys_cache_instr_enable();
+	sys_cache_data_enable();
 }

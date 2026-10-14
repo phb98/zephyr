@@ -40,7 +40,7 @@ typedef enum {
 #define __DSP_PRESENT          0U
 #define __SAUREGION_PRESENT    CONFIG_CPU_HAS_ARM_SAU
 #define __ICACHE_PRESENT       CONFIG_CPU_HAS_ICACHE
-#define __DCACHE_PRESENT       0U /* only the I-cache is managed */
+#define __DCACHE_PRESENT       CONFIG_CPU_HAS_DCACHE
 #define __DTCM_PRESENT         0U
 
 #include <core_starmc1.h>

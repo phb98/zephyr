@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 zephyr_library()
-zephyr_library_sources(soc.c)
+zephyr_library_sources(soc.c mpu_regions.c)
 zephyr_library_sources(boot_header.S)
 
 # Sorts after the start of the ROM region and before the vector table
